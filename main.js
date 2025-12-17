@@ -84,9 +84,13 @@ app.on("ready", function() {
           label: "Настройка меню",
           accelerator: "CmdOrCtrl+Shift+M",
           click: function() {
-            mainWindow.webContents.executeJavaScript(
-              "if (typeof createCustomizationOverlay === 'function') { createCustomizationOverlay(); }"
-            );
+            if (mainWindow && mainWindow.webContents) {
+              mainWindow.webContents.executeJavaScript(
+                "if (typeof createCustomizationOverlay === 'function') { createCustomizationOverlay(); }"
+              ).catch(err => {
+                console.error('Error opening customization overlay:', err);
+              });
+            }
           },
         },
         { type: "separator" },

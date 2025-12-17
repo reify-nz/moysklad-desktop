@@ -79,6 +79,12 @@ function parseMenuItems() {
   return menuItems;
 }
 
+// Escape CSS attribute selector value
+function escapeCssAttributeValue(value) {
+  // Escape special characters that could break CSS attribute selectors
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 // Apply menu preferences by generating dynamic CSS
 function applyMenuPreferences() {
   const preferences = getMenuPreferences();
@@ -88,8 +94,9 @@ function applyMenuPreferences() {
   Object.keys(preferences).forEach(menuTitle => {
     const isVisible = preferences[menuTitle];
     if (!isVisible) {
-      // Hide this menu
-      cssRules.push(`span.subMenuItem-new[title="${menuTitle}"] { display: none; }`);
+      // Hide this menu - escape menuTitle to prevent CSS injection
+      const escapedTitle = escapeCssAttributeValue(menuTitle);
+      cssRules.push(`span.subMenuItem-new[title="${escapedTitle}"] { display: none; }`);
     }
   });
   
@@ -114,6 +121,12 @@ function applyMenuPreferences() {
   `);
   
   appendStyle(cssRules.join('\n'));
+}
+
+// Sanitize menu title for use in HTML IDs
+function sanitizeForId(title) {
+  // Replace non-alphanumeric characters with hyphens and encode to base64 for uniqueness
+  return 'menu-' + btoa(encodeURIComponent(title)).replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 // Create customization overlay UI
@@ -186,7 +199,7 @@ function createCustomizationOverlay() {
     
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.id = `menu-${menuTitle.replace(/\s+/g, '-')}`;
+    checkbox.id = sanitizeForId(menuTitle);
     checkbox.checked = preferences[menuTitle] !== false; // default to visible
     checkbox.style.cssText = 'margin-right: 10px; width: 18px; height: 18px; cursor: pointer;';
     
@@ -222,7 +235,7 @@ function createCustomizationOverlay() {
     // Collect preferences from checkboxes
     const newPreferences = {};
     uniqueMenus.forEach(menuTitle => {
-      const checkbox = document.getElementById(`menu-${menuTitle.replace(/\s+/g, '-')}`);
+      const checkbox = document.getElementById(sanitizeForId(menuTitle));
       newPreferences[menuTitle] = checkbox.checked;
     });
     
@@ -375,10 +388,22 @@ const compose = (...fns) =>
     value => value,
   );
 
-module.exports = {
-  getGoodsData,
-  htmlToElement,
-  createNewButton,
-  createUrlForMovementOfGoods,
-};
-window.exports = module.exports;
+// Export for Node.js/Electron context
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getGoodsData,
+    htmlToElement,
+    createNewButton,
+    createUrlForMovementOfGoods,
+  };
+}
+
+// Export for browser context
+if (typeof window !== 'undefined') {
+  window.exports = {
+    getGoodsData,
+    htmlToElement,
+    createNewButton,
+    createUrlForMovementOfGoods,
+  };
+}
