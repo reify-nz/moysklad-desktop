@@ -125,7 +125,7 @@ function applyMenuPreferences() {
 
 // Sanitize menu title for use in HTML IDs
 function sanitizeForId(title) {
-  // Replace non-alphanumeric characters with hyphens and encode to base64 for uniqueness
+  // Encodes title to base64 for uniqueness, then sanitizes the base64 result for use as HTML ID
   return 'menu-' + btoa(encodeURIComponent(title)).replace(/[^a-zA-Z0-9]/g, '-');
 }
 
