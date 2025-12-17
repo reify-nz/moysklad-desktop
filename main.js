@@ -81,6 +81,23 @@ app.on("ready", function() {
         { label: "О Приложении", selector: "orderFrontStandardAboutPanel:" },
         { type: "separator" },
         {
+          label: "Настройка меню",
+          accelerator: "CmdOrCtrl+Shift+M",
+          click: function() {
+            if (mainWindow && mainWindow.webContents) {
+              // Note: This uses executeJavaScript to call a function from the preload script.
+              // The function is defined in customisations.js which is loaded as a preload script,
+              // making it safe to call. For a more secure approach in larger apps, consider using IPC.
+              mainWindow.webContents.executeJavaScript(
+                "if (typeof createCustomizationOverlay === 'function') { createCustomizationOverlay(); }"
+              ).catch(err => {
+                console.error('Error opening customization overlay:', err);
+              });
+            }
+          },
+        },
+        { type: "separator" },
+        {
           label: "Выйти",
           accelerator: "CmdOrCtrl+Q",
           click: function() {
