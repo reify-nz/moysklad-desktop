@@ -81,6 +81,16 @@ app.on("ready", function() {
         { label: "О Приложении", selector: "orderFrontStandardAboutPanel:" },
         { type: "separator" },
         {
+          label: "Настройка меню",
+          accelerator: "CmdOrCtrl+Shift+M",
+          click: function() {
+            mainWindow.webContents.executeJavaScript(
+              "if (typeof createCustomizationOverlay === 'function') { createCustomizationOverlay(); }"
+            );
+          },
+        },
+        { type: "separator" },
+        {
           label: "Выйти",
           accelerator: "CmdOrCtrl+Q",
           click: function() {

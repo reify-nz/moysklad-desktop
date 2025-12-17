@@ -1,36 +1,101 @@
 console.log("customizations loading");
 
-function appendStyle(styles) {
-  var css = document.createElement("style");
-  css.type = "text/css";
+// ========================================
+// MENU CUSTOMIZATION SYSTEM
+// ========================================
 
-  css.appendChild(document.createTextNode(styles));
+// Default hidden menus (for backward compatibility)
+const DEFAULT_HIDDEN_MENUS = [
+  "Сер. номера",
+  "Внутренние заказы",
+  "Перемещения",
+  "Отчеты комиссионера",
+  "Товары на реализации",
+  "Воронка продаж"
+];
 
-  document.getElementsByTagName("head")[0].appendChild(css);
+// Storage key for menu preferences
+const MENU_PREFS_KEY = 'moysklad_menu_preferences';
+
+// Get menu preferences from localStorage
+function getMenuPreferences() {
+  try {
+    const stored = localStorage.getItem(MENU_PREFS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Error loading menu preferences:', e);
+  }
+  
+  // Initialize with defaults
+  const defaultPrefs = {};
+  DEFAULT_HIDDEN_MENUS.forEach(menu => {
+    defaultPrefs[menu] = false; // false means hidden
+  });
+  return defaultPrefs;
 }
-const formTable = '#site > table > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > div > div > table > tbody > tr:nth-child(2) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody ';
-const styles = `
-    span.subMenuItem-new[title="Сер. номера"] {
-      display: none;
+
+// Save menu preferences to localStorage
+function saveMenuPreferences(preferences) {
+  try {
+    localStorage.setItem(MENU_PREFS_KEY, JSON.stringify(preferences));
+  } catch (e) {
+    console.error('Error saving menu preferences:', e);
+  }
+}
+
+// Parse menu items from the page
+function parseMenuItems() {
+  const menuItems = [];
+  
+  // Find all subMenu items
+  const subMenuItems = document.querySelectorAll('span.subMenuItem-new[title]');
+  subMenuItems.forEach(item => {
+    const title = item.getAttribute('title');
+    if (title) {
+      menuItems.push({
+        title: title,
+        element: item,
+        type: 'submenu'
+      });
     }
-    span.subMenuItem-new[title="Внутренние заказы"] {
-      display: none;
+  });
+  
+  // Find top menu items
+  const topMenuItems = document.querySelectorAll('.topMenuItem-new');
+  topMenuItems.forEach((item, index) => {
+    const textContent = item.textContent.trim();
+    if (textContent) {
+      menuItems.push({
+        title: textContent,
+        element: item,
+        type: 'topmenu',
+        index: index + 1 // nth-child is 1-based
+      });
     }
-    span.subMenuItem-new[title="Перемещения"] {
-      display: none;
+  });
+  
+  return menuItems;
+}
+
+// Apply menu preferences by generating dynamic CSS
+function applyMenuPreferences() {
+  const preferences = getMenuPreferences();
+  let cssRules = [];
+  
+  // Apply preferences for submenus
+  Object.keys(preferences).forEach(menuTitle => {
+    const isVisible = preferences[menuTitle];
+    if (!isVisible) {
+      // Hide this menu
+      cssRules.push(`span.subMenuItem-new[title="${menuTitle}"] { display: none; }`);
     }
-    span.subMenuItem-new[title="Отчеты комиссионера"] {
-      display: none;
-    }
-    span.subMenuItem-new[title="Товары на реализации"] {
-      display: none;
-    }
-    span.subMenuItem-new[title="Воронка продаж"] {
-      display: none;
-    }
-    .topMenuItem-new:nth-child(16) {
-      display: none;
-    }
+  });
+  
+  // Keep the static form customizations
+  const formTable = '#site > table > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > div > div > table > tbody > tr:nth-child(2) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody ';
+  cssRules.push(`
     /* Удаление Упаковка */
     ${formTable} > tr:nth-child(10) > td > table,
     /* Удаление Алкогольная продукция */
@@ -40,16 +105,190 @@ const styles = `
     .column > tbody:nth-child(2) > tr:nth-child(23),
     .column > tbody:nth-child(2) > tr:nth-child(24),
     .column > tbody:nth-child(2) > tr:nth-child(25) {
-    display: none;
+      display: none;
     }
     /* Удаление НДС */
     ${formTable} > tr:nth-child(25) > td:nth-child(1) > div > span {
       display: none;
     }
+  `);
+  
+  appendStyle(cssRules.join('\n'));
+}
+
+// Create customization overlay UI
+function createCustomizationOverlay() {
+  // Remove existing overlay if present
+  const existing = document.getElementById('moysklad-customization-overlay');
+  if (existing) {
+    existing.remove();
+  }
+  
+  const menuItems = parseMenuItems();
+  const preferences = getMenuPreferences();
+  
+  // Create overlay container
+  const overlay = document.createElement('div');
+  overlay.id = 'moysklad-customization-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   `;
+  
+  // Create dialog
+  const dialog = document.createElement('div');
+  dialog.style.cssText = `
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  `;
+  
+  // Create title
+  const title = document.createElement('h2');
+  title.textContent = 'Настройка меню';
+  title.style.cssText = 'margin-top: 0; margin-bottom: 20px; font-size: 24px;';
+  dialog.appendChild(title);
+  
+  // Create description
+  const description = document.createElement('p');
+  description.textContent = 'Выберите, какие пункты меню вы хотите видеть:';
+  description.style.cssText = 'margin-bottom: 20px; color: #666;';
+  dialog.appendChild(description);
+  
+  // Create menu items list
+  const menuList = document.createElement('div');
+  menuList.style.cssText = 'margin-bottom: 20px;';
+  
+  // Get unique menu titles
+  const uniqueMenus = new Set();
+  menuItems.forEach(item => {
+    if (item.type === 'submenu') {
+      uniqueMenus.add(item.title);
+    }
+  });
+  
+  // Create checkboxes for each menu
+  uniqueMenus.forEach(menuTitle => {
+    const itemDiv = document.createElement('div');
+    itemDiv.style.cssText = 'margin-bottom: 12px; display: flex; align-items: center;';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `menu-${menuTitle.replace(/\s+/g, '-')}`;
+    checkbox.checked = preferences[menuTitle] !== false; // default to visible
+    checkbox.style.cssText = 'margin-right: 10px; width: 18px; height: 18px; cursor: pointer;';
+    
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = menuTitle;
+    label.style.cssText = 'cursor: pointer; font-size: 16px;';
+    
+    itemDiv.appendChild(checkbox);
+    itemDiv.appendChild(label);
+    menuList.appendChild(itemDiv);
+  });
+  
+  dialog.appendChild(menuList);
+  
+  // Create button container
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+  
+  // Create save button
+  const saveButton = document.createElement('button');
+  saveButton.textContent = 'Сохранить';
+  saveButton.style.cssText = `
+    padding: 10px 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+  `;
+  saveButton.addEventListener('click', () => {
+    // Collect preferences from checkboxes
+    const newPreferences = {};
+    uniqueMenus.forEach(menuTitle => {
+      const checkbox = document.getElementById(`menu-${menuTitle.replace(/\s+/g, '-')}`);
+      newPreferences[menuTitle] = checkbox.checked;
+    });
+    
+    saveMenuPreferences(newPreferences);
+    overlay.remove();
+    
+    // Show reload message
+    if (confirm('Настройки сохранены! Перезагрузить страницу для применения изменений?')) {
+      window.location.reload();
+    }
+  });
+  
+  // Create cancel button
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Отмена';
+  cancelButton.style.cssText = `
+    padding: 10px 20px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+  `;
+  cancelButton.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  buttonContainer.appendChild(cancelButton);
+  buttonContainer.appendChild(saveButton);
+  dialog.appendChild(buttonContainer);
+  
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+  
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+}
+
+// Register keyboard shortcut for customization overlay
+function registerCustomizationShortcut() {
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+M or Cmd+Shift+M
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
+      e.preventDefault();
+      createCustomizationOverlay();
+    }
+  });
+}
+
+function appendStyle(styles) {
+  var css = document.createElement("style");
+  css.type = "text/css";
+
+  css.appendChild(document.createTextNode(styles));
+
+  document.getElementsByTagName("head")[0].appendChild(css);
+}
 
 function onReady() {
-  appendStyle(styles);
+  applyMenuPreferences();
+  registerCustomizationShortcut();
   setTimeout(createMovementOfGoodsButton, 5000);
 }
 
